@@ -27,3 +27,6 @@ Forked from
 
 ## Modify the code
 Modify `./roles.html` to modify the graph style, grants to include/exclude, node dependency etc.
+
+## Example graph
+![image](./images/example.png)
