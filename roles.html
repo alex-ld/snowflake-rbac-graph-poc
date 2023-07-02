@@ -41,36 +41,53 @@
 <script id="data_load_js">
   var data_file_url = "data/grants_to_roles.json";
 
+  const granted_on_to_filteron = new Set([
+    "ROLE",
+    'DATABASE',
+    "SCHEMA",
+    "WAREHOUSE",
+    // "VIEW",
+    // "ACCOUNT",
+    // "TABLE",
+    'FUNCTION'
+  ]);
+
   //object type to fill type mapping
   const objecttype_to_fillcolor = {
         'ROLE': "fill: khaki"
         ,'SCHEMA': "fill: yellow"
         ,'WAREHOUSE': "fill: lightsalmon"
         ,'DATABASE': "fill: burlywood"
+        ,'TABLE': "fill: burlywood"
+        ,'VIEW': "fill: burlywood"
+        ,'FUNCTION': "fill: burlywood"
       };
 
   //privilege edge style mapping
   const privilege_to_edgestyle = {
-        'USAGE': "stroke: green; fill: none; stroke-width: 1.5px"
+        'SELECT': "stroke: black; fill: none; stroke-width: 1.5px",
+        'OWNERSHIP': "stroke: red; fill: none; stroke-width: 1.5px",
+        'UPDATE': "stroke: blue; fill: none; stroke-width: 1.5px",
+        'INSERT': "stroke: blue; fill: none; stroke-width: 1.5px",
       };
-
+  
+  // Ignored grants from certain role
+  const ignored_grants_from_roles = [
+    'DATA_DEPT',
+    'DATA_DEPT_ELT',
+    'DATA_DEPT_STAGE',
+    'DATA_DEPT_DEVELOPMENT'
+  ];
   // Create a new directed graph
   const g = new dagreD3.graphlib.Graph({compound:true}).setGraph({
     rankdir: "RL" 
+    ,ranksep: 2000 ,ranker: 'tight-tree'
+    ,nodesep: 70 ,edgesep: 70
   });
-
-  // var g = new dagreD3.graphlib.Graph().setGraph({
-  //   rankdir: "RL" 
-  //   ,ranksep: 300 ,ranker: 'tight-tree'
-  //   ,nodesep: 75 ,edgesep: 50
-  // });
-
   //define groups for various object types
-  g.setNode('ROLE', {label: 'Roles', clusterLabelPos: 'top', style: 'fill: ivory'});
-  g.setNode('DATABASE', {label: 'Database', clusterLabelPos: 'top',style: 'fill: lemonchiffon'});
-  g.setNode('SCHEMA', {label: 'Schema', clusterLabelPos: 'top',style: 'fill: lightgray'});
-  g.setNode('WAREHOUSE', {label: 'Warehouse', clusterLabelPos: 'top',style: 'fill: seashell'});
-
+  granted_on_to_filteron.forEach( x=> {
+    g.setNode(x, {label: x, clusterLabelPos: 'top', style: 'fill: ivory'});  
+  })
   var grants_and_roles = {};
   
   function parseJsonDataIntoStructure(json) {
@@ -78,14 +95,17 @@
     var role_edges = [];
     var edges_by_grantee = {};
     var max_string_size = 0;
-    const grantedon_to_filteron = new Set(["ROLE" ,'DATABASE' ,"SCHEMA" ,"WAREHOUSE"]);
     const privileges_to_filterout = new Set(["OWNERSHIP"]); 
+    console.log(
+      new Set(json.map(x=>x.PRIVILEGE))
+    )
     
     json
-    .filter(x => grantedon_to_filteron.has(x.GRANTED_ON))
-    .filter(x => privileges_to_filterout.has(x.PRIVILEGE) == false)
+    .filter(x => granted_on_to_filteron.has(x.GRANTED_ON))
+    // .filter(x => privileges_to_filterout.has(x.PRIVILEGE) == false)
+    .filter(x => ignored_grants_from_roles.includes(x.GRANTED_BY) == false)
     .forEach(r => {
-      console.log(r);
+      // console.log(r);
       var str_sz = Math.max(r.GRANTEE_NAME.length ,r.NAME.length)
       max_string_size = (str_sz > max_string_size) ? str_sz : max_string_size;
 
@@ -141,7 +161,8 @@
             ,{ label: role_edg.label
             ,style: privilege_to_edgestyle[role_edg.label]
              //,curve: d3.curveBasis 
-         });
+            }
+         );
       });
 
       return g
@@ -163,7 +184,7 @@
       // Run the renderer. This is what draws the final graph.
       render(inner, g);
       
-      // // Center the graph
+      // Center the graph
       // var initialScale = 0.75;
       // svg.call(zoom.transform, d3.zoomIdentity.translate((svg.attr("width") - g.graph().width * initialScale) / 2, 20).scale(initialScale));
       
@@ -176,7 +197,7 @@
   .then((role_array_json) => { 
     const parsed_data = parseJsonDataIntoStructure(role_array_json);
     
-    var dagre_g = addNodesToGraph(parsed_data.nodes ,parsed_data.edges ,parsed_data.max_len + 250);
+    var dagre_g = addNodesToGraph(parsed_data.nodes ,parsed_data.edges ,parsed_data.max_len + 500);
     renderGraphToSVG(dagre_g);
   })
   .catch(err => { throw err });  
